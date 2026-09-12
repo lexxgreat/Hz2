@@ -3053,87 +3053,21 @@ onAuthStateChanged(auth, async (user) => {
 })();
 </script>
 
-<!-- PWA install button — ALWAYS visible, with platform-aware click handler -->
-<button id="pwa-install-btn" style="position:fixed;top:calc(12px + env(safe-area-inset-top));right:12px;z-index:9999;display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:99px;border:1px solid rgba(108,71,255,0.7);background:linear-gradient(135deg,rgba(108,71,255,0.45),rgba(0,212,255,0.25));color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(108,71,255,0.4),0 0 0 3px rgba(108,71,255,0.08);animation:pwaBtnPulse 2.5s ease-in-out infinite;">⬇ Установить приложение</button>
-<style>
-@keyframes pwaBtnPulse{0%,100%{box-shadow:0 4px 20px rgba(108,71,255,0.4),0 0 0 3px rgba(108,71,255,0.08)}50%{box-shadow:0 4px 28px rgba(108,71,255,0.6),0 0 0 6px rgba(108,71,255,0.12)}}
-</style>
-
-<!-- PWA install modal — platform-specific instructions -->
-<div id="pwa-install-modal" style="position:fixed;inset:0;z-index:10000;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);padding:24px;">
-  <div style="background:#0F1228;border:1px solid rgba(108,71,255,0.4);border-radius:20px;padding:24px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(108,71,255,0.25);">
-    <div style="text-align:center;font-size:36px;margin-bottom:12px;">📲</div>
-    <h3 style="color:#fff;font-size:17px;font-weight:600;text-align:center;margin-bottom:14px;font-family:'Inter',sans-serif;">Установка на главный экран</h3>
-    <p id="pwa-install-steps" style="color:rgba(255,255,255,0.85);font-size:13.5px;line-height:1.65;font-family:'Inter',sans-serif;"></p>
-    <button onclick="document.getElementById('pwa-install-modal').style.display='none'" style="margin-top:18px;width:100%;padding:11px;border-radius:12px;border:none;background:rgba(108,71,255,0.6);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;">Понятно</button>
-  </div>
-</div>
+<!-- Note: Custom install button removed — let Chrome show the native install prompt.
+     Chrome shows a mini-infobar at the top of the page when PWA criteria are met.
+     Do NOT call e.preventDefault() on 'beforeinstallprompt' — that suppresses the native UI. -->
 
 <script>
 (function() {
-  const installBtn = document.getElementById('pwa-install-btn');
-  const installModal = document.getElementById('pwa-install-modal');
-  const installSteps = document.getElementById('pwa-install-steps');
-
-  function detectPlatform() {
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    // iOS detection (including Chrome/Firefox on iPadOS which report as Mac)
-    const isIOS = (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) ||
-                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
-    const isAndroid = /Android/.test(ua);
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                         window.navigator.standalone === true;
-
-    if (isStandalone) return 'installed';
-    if (isIOS && isSafari) return 'ios-safari';
-    if (isIOS) return 'ios-other'; // Chrome on iOS, etc.
-    if (isAndroid) return 'android';
-    return 'desktop';
+  // Detect if app is already running in standalone (installed) mode — useful for analytics/debug
+  function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           window.navigator.standalone === true;
   }
-
-  function showInstructions(platform) {
-    if (platform === 'ios-safari') {
-      installSteps.innerHTML = 'На iPhone/iPad приложение устанавливается через Safari:<br><br>1️⃣ Нажмите кнопку <b>«Поделиться»</b> (квадрат со стрелкой ↑) внизу экрана<br><br>2️⃣ Прокрутите вниз, выберите <b>«На экран Домой»</b><br><br>3️⃣ Нажмите <b>«Добавить»</b> — иконка появится на главном экране';
-    } else if (platform === 'ios-other') {
-      installSteps.innerHTML = 'На iOS приложение можно установить только через Safari:<br><br>1️⃣ Откройте <b>Safari</b> (не Chrome!)<br><br>2️⃣ Перейдите: lexxgreat.github.io/Hz2<br><br>3️⃣ Нажмите <b>«Поделиться»</b> → <b>«На экран Домой»</b> → <b>«Добавить»</b>';
-    } else if (platform === 'android') {
-      installSteps.innerHTML = 'На Android Chrome приложение устанавливается так:<br><br>1️⃣ Нажмите меню <b>⋮</b> (правый верхний угол)<br><br>2️⃣ Выберите <b>«Установить приложение»</b> / <b>«Add to Home screen»</b><br><br>3️⃣ Подтвердите установку — иконка появится на главном экране';
-    } else {
-      installSteps.innerHTML = 'На компьютере приложение устанавливается так:<br><br>1️⃣ Найдите иконку 📱 в правой части адресной строки<br><br>2️⃣ Нажмите её → <b>«Установить»</b><br><br>3️⃣ Приложение откроется в отдельном окне и появится в списке приложений';
-    }
-    installModal.style.display = 'flex';
-  }
-
-  // Capture native install prompt (Android Chrome / Desktop)
-  let deferredPrompt = null;
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-  });
-
-  // Button is ALWAYS visible (unless installed). Click → native prompt or instructions modal.
-  installBtn.addEventListener('click', async () => {
-    const platform = detectPlatform();
-
-    // Native prompt available (Android Chrome / Desktop Chrome)
-    if (deferredPrompt && (platform === 'android' || platform === 'desktop')) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        installBtn.style.display = 'none';
-      }
-      deferredPrompt = null;
-      return;
-    }
-
-    // No native prompt — show platform-specific instructions
-    showInstructions(platform);
-  });
-
-  // If running in standalone (already installed), hide the button
-  if (detectPlatform() === 'installed') {
-    installBtn.style.display = 'none';
+  if (isStandalone()) {
+    console.log('[PWA] Running in installed mode');
+  } else {
+    console.log('[PWA] Running in browser — Chrome will show install prompt when ready');
   }
 })();
 </script>
